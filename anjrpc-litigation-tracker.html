@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ANJRPC 2A Litigation Tracker</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg-primary: #f4f5f7;
+            --bg-card: #ffffff;
+            --bg-header: #1b2a4a;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6c757d;
+            --text-on-dark: #ffffff;
+            --accent: #2563eb;
+            --positive: #16a34a;
+            --negative: #dc2626;
+            --warning: #d97706;
+            --neutral: #6c757d;
+            --gap: 16px;
+            --radius: 10px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+        .container { max-width: 1000px; width: 100%; margin: 0 auto; padding: var(--gap); }
+        header {
+            background: var(--bg-header);
+            color: var(--text-on-dark);
+            padding: 20px 24px;
+            border-radius: var(--radius);
+            margin-bottom: var(--gap);
+        }
+        header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+        header .subtitle { font-size: 13px; opacity: 0.7; }
+        .filters {
+            display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+            margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.15);
+        }
+        .filter-group { display: flex; align-items: center; gap: 6px; }
+        .filter-group label { font-size: 12px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.5px; }
+        .filter-group select, .search-input {
+            padding: 6px 10px; border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px; background: rgba(255,255,255,0.1);
+            color: var(--text-on-dark); font-size: 13px;
+        }
+        .filter-group select option { background: var(--bg-header); color: #fff; }
+        .search-input { width: 180px; }
+        .search-input::placeholder { color: rgba(255,255,255,0.4); }
+        .kpi-row {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: var(--gap); margin-bottom: var(--gap);
+        }
+        .kpi-card {
+            background: var(--bg-card); border-radius: var(--radius);
+            padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .kpi-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .kpi-value { font-size: 28px; font-weight: 700; }
+        .kpi-detail { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .chart-row {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--gap); margin-bottom: var(--gap);
+        }
+        .chart-container {
+            background: var(--bg-card); border-radius: var(--radius);
+            padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .chart-container h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+        .chart-container .cbox { position: relative; width: 100%; height: 500px; }
+        .chart-container .cbox-court { position: relative; width: 100%; height: 280px; }
+        .chart-container canvas { max-height: 500px; }
+        .chart-container canvas#chart-court { max-height: 280px; }
+        .hbar { display: flex; flex-direction: column; justify-content: space-evenly; height: 100%; }
+        .hbar-row { display: grid; grid-template-columns: 150px 1fr 28px; align-items: center; gap: 8px; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: background 0.15s; }
+        .hbar-row:hover { background: #eef2f7; }
+        .hbar-row.active { background: #e0e7ff; }
+        .hbar-label { font-size: 11px; color: var(--text-secondary); text-align: right; line-height: 1.15; }
+        .hbar-track { background: #f1f5f9; border-radius: 4px; height: 20px; overflow: hidden; }
+        .hbar-fill { height: 100%; border-radius: 4px; min-width: 2px; transition: filter 0.15s; }
+        .hbar-row:hover .hbar-fill { filter: brightness(1.08); }
+        .hbar-val { font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+        .donut-wrap { display: flex; align-items: center; justify-content: center; gap: 24px; height: 100%; flex-wrap: wrap; }
+        .donut { width: 180px; height: 180px; border-radius: 50%; position: relative; flex: 0 0 auto; }
+        .donut::after { content: ''; position: absolute; inset: 22.5%; background: var(--bg-card); border-radius: 50%; }
+        .donut-legend { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-primary); }
+        .donut-legend .lg { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 3px 8px; border-radius: 4px; transition: background 0.15s; }
+        .donut-legend .lg:hover { background: #eef2f7; }
+        .donut-legend .lg.active { background: #e0e7ff; font-weight: 600; }
+        .donut-legend .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+        .timeline-section {
+            background: var(--bg-card); border-radius: var(--radius);
+            padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            margin-bottom: var(--gap);
+        }
+        .timeline-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+        .timeline-item {
+            display: flex; gap: 14px; padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .timeline-item:last-child { border-bottom: none; }
+        .timeline-date {
+            min-width: 100px; font-size: 12px; font-weight: 600;
+            color: var(--accent); white-space: nowrap; padding-top: 2px;
+        }
+        .timeline-content { flex: 1; }
+        .timeline-title { font-size: 13px; font-weight: 600; }
+        .timeline-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .table-section {
+            background: var(--bg-card); border-radius: var(--radius);
+            padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            overflow-x: auto; margin-bottom: var(--gap);
+        }
+        .table-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+        .table-count { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+        thead th:nth-child(1) { width: 10%; }
+        thead th:nth-child(2) { width: 22%; }
+        thead th:nth-child(3) { width: 13%; }
+        thead th:nth-child(4) { width: 18%; }
+        thead th:nth-child(5) { width: 20%; }
+        thead th:nth-child(6) { width: 9%; }
+        thead th:nth-child(7) { width: 7%; }
+        thead th {
+            text-align: left; padding: 10px 12px;
+            border-bottom: 2px solid #dee2e6;
+            color: var(--text-secondary); font-weight: 600; font-size: 11px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            white-space: nowrap; cursor: pointer; user-select: none;
+        }
+        thead th:hover { color: var(--text-primary); background: #f8f9fa; }
+        tbody td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+        tbody tr:hover { background: #f8f9fa; }
+        .status-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 600; white-space: normal;
+        }
+        .status-active { background: #dbeafe; color: #1d4ed8; }
+        .status-enbanc-argued { background: #ccfbf1; color: #0f766e; }
+        .status-enbanc-pending { background: #ffedd5; color: #9a3412; }
+        .status-motions { background: #e0e7ff; color: #3730a3; }
+        .status-decided { background: #d1fae5; color: #065f46; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-denied { background: #fee2e2; color: #991b1b; }
+        .status-scotus { background: #ede9fe; color: #5b21b6; }
+        .category-tag {
+            display: inline-block; padding: 2px 6px; border-radius: 4px;
+            font-size: 10px; font-weight: 600; background: #f1f5f9; color: #475569;
+            white-space: normal;
+        }
+        .nj-flag {
+            display: inline-block; padding: 1px 5px; border-radius: 3px;
+            font-size: 9px; font-weight: 700; background: #fbbf24; color: #78350f;
+            margin-left: 4px;
+        }
+        .anjrpc-flag {
+            display: inline-block; padding: 1px 5px; border-radius: 3px;
+            font-size: 9px; font-weight: 700; background: #dc2626; color: #fff;
+            margin-left: 4px;
+        }
+        .expand-btn {
+            background: none; border: 1px solid #e2e8f0; border-radius: 4px;
+            padding: 2px 8px; cursor: pointer; font-size: 11px; color: var(--accent);
+        }
+        .expand-btn:hover { background: #f1f5f9; }
+        .detail-row { display: none; }
+        .detail-row.open { display: table-row; }
+        .detail-row td {
+            padding: 12px 12px 16px 12px; background: #fafbfc;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .detail-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .detail-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 2px; }
+        .detail-value { font-size: 13px; }
+        footer {
+            text-align: center; padding: 16px;
+            font-size: 12px; color: var(--text-secondary);
+        }
+        @media (max-width: 768px) {
+            .container { padding: 8px; }
+            header { padding: 14px 16px; border-radius: 8px; }
+            header h1 { font-size: 17px; }
+            .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .kpi-card { padding: 12px 14px; }
+            .kpi-value { font-size: 22px; }
+            .chart-row { grid-template-columns: 1fr; }
+            .chart-container { padding: 14px 16px; }
+            .filters { flex-direction: column; align-items: stretch; gap: 8px; }
+            .filter-group { flex-direction: column; align-items: stretch; gap: 4px; }
+            .filter-group select, .search-input { width: 100%; font-size: 16px; padding: 8px 10px; }
+            .timeline-section { padding: 14px 16px; }
+            .timeline-item { flex-direction: column; gap: 4px; }
+            .timeline-date { min-width: unset; }
+            .table-section { padding: 12px 8px; -webkit-overflow-scrolling: touch; }
+            table { table-layout: auto; min-width: 700px; }
+            thead th { padding: 8px 6px; font-size: 10px; }
+            tbody td { padding: 8px 6px; font-size: 12px; }
+            .detail-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 480px) {
+            .kpi-row { grid-template-columns: 1fr 1fr; gap: 6px; }
+            .kpi-card { padding: 10px 12px; }
+            .kpi-value { font-size: 20px; }
+            header h1 { font-size: 15px; }
+            header .subtitle { font-size: 11px; }
+        }
+        @media print {
+            body { background: white; }
+            .filters { display: none; }
+            .expand-btn { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Second Amendment Litigation Tracker</h1>
+            <div class="subtitle">ANJRPC — New Jersey Cases — Updated <span id="update-date">June 11, 2026</span></div>
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Court Level</label>
+                    <select id="filter-court" onchange="dashboard.applyFilters()">
+                    <option value="all">All Courts</option>
+                </select>
+                </div>
+                <div class="filter-group">
+                    <label>Category</label>
+                    <select id="filter-category" onchange="dashboard.applyFilters()">
+                    <option value="all">All Categories</option>
+                </select>
+                </div>
+                <div class="filter-group">
+                    <label>Status</label>
+                    <select id="filter-status" onchange="dashboard.applyFilters()">
+                    <option value="all">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="decided">Decided / Final</option>
+                    <option value="pending">Cert Pending</option>
+                </select>
+                </div>
+                <div class="filter-group">
+                    <label>ANJRPC</label>
+                    <select id="filter-anjrpc" onchange="dashboard.applyFilters()">
+                    <option value="all">All Cases</option>
+                    <option value="yes">ANJRPC Cases Only</option>
+                </select>
+                </div>
+                <div class="filter-group">
+                    <input type="text" class="search-input" id="search-input" placeholder="Search cases..." oninput="dashboard.applyFilters()" />
+                </div>
+            </div>
+        </header>
+        <section class="kpi-row" id="kpi-row"></section>
+        <section class="chart-row">
+            <div class="chart-container">
+                <h3>Cases by Category</h3>
+                <div class="cbox" id="cbox-category"></div>
+            </div>
+            <div class="chart-container">
+                <h3>Cases by Court Level</h3>
+                <div class="cbox-court" id="cbox-court"></div>
+            </div>
+        </section>
+        <section class="timeline-section">
+            <h3>Upcoming Milestones</h3>
+            <div id="timeline"></div>
+        </section>
+        <section class="table-section">
+            <h3>Case Details</h3>
+            <div class="table-count" id="table-count"></div>
+            <table>
+                <thead id="table-head"></thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </section>
+        <footer>
+            ANJRPC Second Amendment Litigation Tracker — Data sourced from Gun Case Tracker by FPC.org, federal court dockets, SCOTUSblog, NRA-ILA, SAF, Duke Firearms Law Center — For informational purposes only, not legal advice
+        </footer>
+    </div>
+    <script>
+        const CASES = [
+            {
+                id: "24-1046", name: "Wolford v. Lopez", court: "U.S. Supreme Court", courtLevel: "SCOTUS",
+                category: "Sensitive Places / Private Property Carry", state: "HI",
+                summary: "Challenges Hawaii's presumptive prohibition on licensed concealed carry on private property open to the public without express owner permission.",
+                plaintiffs: "Jason Wolford, Alison Wolford, Atom Kasprzycki, Hawaii Firearms Coalition",
+                defendants: "Anne E. Lopez (Hawaii AG)",
+                status: "Oral arguments completed", statusClass: "status-scotus",
+                statusGroup: "active",
+                nextPlaintiffs: "Await Supreme Court decision",
+                nextDefendants: "Defend Hawaii law before Supreme Court",
+                lastEvent: "Oral arguments held January 20, 2026", lastDate: "2026-01-20",
+                nextMilestone: "Supreme Court decision July 2026", milestoneDate: "2026-07-01",
+                anjrpc: false, nj: false
+            },
+            {
+                id: "24-1234", name: "United States v. Hemani", court: "U.S. Supreme Court", courtLevel: "SCOTUS",
+                category: "Drug User Prohibition", state: "TX",
+                summary: "Tests whether federal law prohibiting gun possession by users of illegal drugs (18 U.S.C. § 922(g)(3)) violates the Second Amendment. Majority appeared skeptical of government position.",
+                plaintiffs: "Ali Danial Hemani",
+                defendants: "United States of America",
+                status: "Oral arguments completed", statusClass: "status-scotus",
+                statusGroup: "active",
+                nextPlaintiffs: "Await Supreme Court decision",
+                nextDefendants: "Defend federal drug user prohibition statute",
+                lastEvent: "Oral arguments held March 2, 2026", lastDate: "2026-03-02",
+                nextMilestone: "Supreme Court decision July 2026", milestoneDate: "2026-07-01",
+                anjrpc: false, nj: false
+            },
+            {
+                id: "23-1900", name: "Koons v. Attorney General of NJ", court: "Third Circuit (en banc)", courtLevel: "Appellate",
+                category: "Sensitive Places", state: "NJ",
+                summary: "Challenges NJ's 25+ designated sensitive places where firearms are prohibited. Dec 11, 2025: Third Circuit vacated prior panel decision and granted en banc rehearing (consolidated with Siegel). Feb 11, 2026: oral arguments held before full 14-judge panel.",
+                plaintiffs: "Ronald Koons, Second Amendment Foundation, Firearms Policy Coalition",
+                defendants: "Matthew Platkin (NJ AG)",
+                status: "En banc oral arguments held", statusClass: "status-enbanc-argued",
+                statusGroup: "active",
+                nextPlaintiffs: "Await en banc panel decision",
+                nextDefendants: "Defend sensitive places law before full court",
+                lastEvent: "En banc oral argument before full 14-judge panel February 11, 2026", lastDate: "2026-02-11",
+                nextMilestone: "En banc decision expected mid-to-late 2026", milestoneDate: "2026-09-30",
+                anjrpc: false, nj: true
+            },
+            {
+                id: "23-2043", name: "Siegel v. Platkin", court: "Third Circuit (en banc)", courtLevel: "Appellate",
+                category: "Carry Restrictions", state: "NJ",
+                summary: "Challenges NJ 'Carry Killer' law restrictions. Dec 11, 2025: Third Circuit vacated prior panel decision and granted en banc rehearing. Feb 11, 2026: oral arguments held before full 14-judge panel. Current enforcement status quo from 2023: carry in vehicles permitted; 'vampire rule' (private property ban) blocked; insurance requirement not enforceable. Parks, beaches, zoos, libraries, museums, bars/restaurants, casinos, and healthcare facilities remain prohibited.",
+                plaintiffs: "NRA, ANJRPC, multiple individuals",
+                defendants: "Matthew Platkin (NJ AG)",
+                status: "En banc oral arguments held", statusClass: "status-enbanc-argued",
+                statusGroup: "active",
+                nextPlaintiffs: "Await en banc panel decision",
+                nextDefendants: "Defend carry law before full court",
+                lastEvent: "En banc oral argument before full 14-judge panel February 11, 2026", lastDate: "2026-02-11",
+                nextMilestone: "En banc decision expected mid-to-late 2026", milestoneDate: "2026-09-30",
+                anjrpc: true, nj: true
+            },
+            {
+                id: "24-2415", name: "ANJRPC v. Platkin (AWB & Mag Ban)", court: "Third Circuit (en banc)", courtLevel: "Appellate",
+                category: "Assault Weapons Ban / Magazine Capacity", state: "NJ",
+                summary: "Challenges NJ's ban on assault firearms (incl. AR-15s) and large-capacity magazines (10+ rounds). District court struck down AR-15 ban for home self-defense mid-2024; upheld magazine ban. Case fast-tracked to full Third Circuit. Trump DOJ filed amicus brief supporting plaintiffs Sept 19, 2025. En banc oral arguments held Oct 15, 2025. April 24, 2026: NJ AG letter urged court to follow six sister circuits after D.C. Circuit granted en banc rehearing in Benson (vacating that court's pro-2A mag ban ruling). Stay in place — 10-round magazine limit and assault firearms ban remain fully enforceable until Third Circuit issues new ruling.",
+                plaintiffs: "ANJRPC, Mark Cheeseman, Timothy Connelly, Firearms Policy Coalition",
+                defendants: "Matthew Platkin (NJ AG)",
+                status: "En banc — awaiting decision", statusClass: "status-enbanc-argued",
+                statusGroup: "active",
+                nextPlaintiffs: "Await en banc panel decision",
+                nextDefendants: "Await en banc panel decision",
+                lastEvent: "NJ AG 28(j) letter citing D.C. Circuit's Benson en banc grant — April 24, 2026", lastDate: "2026-04-24",
+                nextMilestone: "En banc decision expected 2026", milestoneDate: "2026-06-30",
+                anjrpc: true, nj: true
+            },
+            {
+                id: "1:25-cv-13527", name: "Padua v. Platkin (Suppressors)", court: "D.N.J.", courtLevel: "District",
+                category: "Suppressor Ban", state: "NJ",
+                summary: "Six gun rights organizations challenging NJ's complete ban on firearm suppressors. Filed July 18, 2025. Companion case: FPC v. Platkin (3:25-cv-13522). Pretrial factual discovery closed March 12, 2026; telephone status conference held May 22, 2026; dispositive motions due July 10, 2026.",
+                plaintiffs: "ASA, NRA, SCI, SAF, ANJRPC, NJFOS, Silencer Shop",
+                defendants: "Matthew Platkin (NJ AG), Patrick Callahan (State Police)",
+                status: "Active — dispositive motions ahead", statusClass: "status-motions",
+                statusGroup: "active",
+                nextPlaintiffs: "File dispositive motions by July 10, 2026",
+                nextDefendants: "File dispositive motions by July 10, 2026",
+                lastEvent: "Telephone status conference held May 22, 2026", lastDate: "2026-05-22",
+                nextMilestone: "Dispositive motions due July 10, 2026", milestoneDate: "2026-07-10",
+                anjrpc: true, nj: true
+            },
+            {
+                id: "3:24-cv-09479", name: "Struck v. Platkin (One-Gun-A-Month)", court: "D.N.J.", courtLevel: "District",
+                category: "Purchase Restrictions", state: "NJ",
+                summary: "FPC challenge to NJ's one-handgun-per-30-days purchase limit (N.J.S.A. § 2C:58-3(i)). Filed Sept 2024 by FPC. NRA added as co-plaintiff Nov 2025. Court granted the state's motion to consolidate with Benton v. Platkin (reported early June 2026) — Benton (1:24-cv-07098) is the lead case. FPC won similar challenge against California's comparable ban.",
+                plaintiffs: "Matthew Struck, Daniel Francisco, Firearms Policy Coalition, NRA",
+                defendants: "Matthew Platkin (NJ AG)",
+                status: "Consolidated with Benton (lead case)", statusClass: "status-active",
+                statusGroup: "active",
+                nextPlaintiffs: "Proceed under consolidated Benton docket",
+                nextDefendants: "Defend one-gun-a-month restriction",
+                lastEvent: "Consolidation with Benton v. Platkin granted (reported early June 2026)", lastDate: "2026-06-01",
+                nextMilestone: "Motion practice under consolidated docket", milestoneDate: "2026-12-01",
+                anjrpc: false, nj: true
+            },
+            {
+                id: "25-2546", name: "NSSF v. Platkin (PLCAA)", court: "Third Circuit", courtLevel: "Appellate",
+                category: "Firearms Industry Liability", state: "NJ",
+                summary: "NSSF challenges NJ's anti-PLCAA 'public nuisance' law enabling lawsuits against firearms industry. Originally filed Nov 2022; dismissed for lack of standing. Reopened Feb 2025 after AG Platkin sued GLOCK and Sig Sauer under the law. On appeal to Third Circuit.",
+                plaintiffs: "National Shooting Sports Foundation (NSSF)",
+                defendants: "Matthew Platkin (NJ AG)",
+                status: "Appeal — open", statusClass: "status-active",
+                statusGroup: "active",
+                nextPlaintiffs: "Brief appeal before Third Circuit",
+                nextDefendants: "Defend PLCAA exception law",
+                lastEvent: "Appeal filed to Third Circuit August 2025", lastDate: "2025-08-14",
+                nextMilestone: "Third Circuit briefing and argument", milestoneDate: "2026-12-01",
+                anjrpc: false, nj: true
+            },
+            {
+                id: "23-3058", name: "Defense Distributed v. Davenport", court: "Third Circuit", courtLevel: "Appellate",
+                category: "3D-Printed Firearms / First Amendment", state: "NJ",
+                summary: "Challenges NJ ban on distributing 3D-printed firearm files. Panel ruled Feb 12, 2026 that purely functional computer code is not protected speech; dismissed with prejudice. SAF filed petition for en banc rehearing March 2026.",
+                plaintiffs: "Defense Distributed, Second Amendment Foundation",
+                defendants: "New Jersey AG (Davenport)",
+                status: "En banc petition filed", statusClass: "status-enbanc-pending",
+                statusGroup: "active",
+                nextPlaintiffs: "Await en banc decision; if denied, petition SCOTUS",
+                nextDefendants: "Oppose en banc rehearing",
+                lastEvent: "SAF filed en banc rehearing petition March 2026", lastDate: "2026-03-01",
+                nextMilestone: "Third Circuit en banc rehearing decision", milestoneDate: "2026-09-01",
+                anjrpc: false, nj: true
+            },
+            {
+                id: "1:24-cv-07098", name: "Benton v. Platkin", court: "D.N.J.", courtLevel: "District",
+                category: "Gun Permits / FID", state: "NJ",
+                summary: "Broad challenge to NJ's firearms permitting scheme — FID requirements, handgun purchase permits, character references, fees, waiting periods. Filed June 2024 by CNJFO, GOA, GOF. Partially dismissed without prejudice. Court granted consolidation with Struck v. Platkin (one-gun-a-month) — Benton is the lead case (reported early June 2026).",
+                plaintiffs: "Christian Benton, CNJFO, Gun Owners of America, Gun Owners Foundation",
+                defendants: "Matthew Platkin (NJ AG), Phil Olivo (Pennsauken Police Chief)",
+                status: "Consolidated — lead case", statusClass: "status-motions",
+                statusGroup: "active",
+                nextPlaintiffs: "Refile dismissed claims; proceed as lead case in consolidated action",
+                nextDefendants: "Defend permitting scheme and one-gun-a-month restriction",
+                lastEvent: "Consolidation with Struck v. Platkin granted — Benton lead case (reported early June 2026)", lastDate: "2026-06-01",
+                nextMilestone: "Motion practice under consolidated docket", milestoneDate: "2026-09-01",
+                anjrpc: false, nj: true
+            },
+            {
+                id: "1:25-cv-00997", name: "Bergmann-Schoch v. Platkin", court: "D.N.J.", courtLevel: "District",
+                category: "Hollow Point Ammunition Ban", state: "NJ",
+                summary: "Challenges NJ's 1978 ban on possession of hollow point ammunition outside the home (N.J.S.A. § 2C:39-3(f)). Filed Feb 2025 by CNJFO, GOA, GOF. Plaintiffs filed for summary judgment March 12, 2026; NJ cross-moved April 9; plaintiffs' combined opposition/reply filed May 7; defendants' reply due May 28, 2026 — cross-motions now fully briefed. Status conference scheduled August 6, 2026.",
+                plaintiffs: "Heidi Bergmann-Schoch, CNJFO, Gun Owners of America, Gun Owners Foundation",
+                defendants: "Matthew Platkin (NJ AG), Patrick Callahan (State Police), Scott Coffina",
+                status: "Summary judgment — fully briefed", statusClass: "status-motions",
+                statusGroup: "active",
+                nextPlaintiffs: "Await ruling on cross-motions; status conference August 6, 2026",
+                nextDefendants: "Await ruling on cross-motions; status conference August 6, 2026",
+                lastEvent: "Summary judgment cross-motion briefing completed May 28, 2026", lastDate: "2026-05-28",
+                nextMilestone: "Status conference August 6, 2026", milestoneDate: "2026-08-06",
+                anjrpc: false, nj: true
+            },
+            {
+                id: "3:25-cv-08826", name: "Hague v. Platkin", court: "D.N.J.", courtLevel: "District",
+                category: "Under-21 Restrictions", state: "NJ",
+                summary: "Challenges NJ laws prohibiting adults under 21 from purchasing, possessing, or carrying handguns. Also challenges federal ban on FFL transfers to under-21. Filed June 2025 by SAF and NJFOS.",
+                plaintiffs: "Lily Hague, SAF, New Jersey Firearms Owners Syndicate",
+                defendants: "Matthew Platkin (NJ AG)",
+                status: "Active — early stage", statusClass: "status-active",
+                statusGroup: "active",
+                nextPlaintiffs: "Continue litigation",
+                nextDefendants: "Defend age restrictions",
+                lastEvent: "Complaint filed June 9, 2025", lastDate: "2025-06-09",
+                nextMilestone: "Motion practice", milestoneDate: "2026-12-01",
+                anjrpc: false, nj: true
+            },
+            {
+                id: "2:25-cv-17131", name: "Aliaj v. Fort Lee PD", court: "D.N.J.", courtLevel: "District",
+                category: "Gun Seizures / Due Process", state: "NJ",
+                summary: "SAF challenges warrantless seizure of lawful gun owner's firearms after wife's mental health misunderstanding at medical clinic. No warrant or red flag order was obtained. Filed Nov 2025. Aliaj's firearms returned Dec 2025. June 2026: SAF/NJFOS filed amended complaint expanding the case — added plaintiffs Martin Hroncich and Luis Rene De La Cruz Franco (similar Bergen County confiscations and permit denials/revocations) and added the Bergen County Prosecutor's Office, Borough of Fort Lee, Borough of Paramus, and other municipal defendants.",
+                plaintiffs: "Elsid Aliaj, Martin Hroncich, Luis Rene De La Cruz Franco, SAF, New Jersey Firearms Owners Syndicate",
+                defendants: "Fort Lee PD, Bergen County Prosecutor's Office, Borough of Paramus, et al.",
+                status: "Active — amended complaint expands case", statusClass: "status-active",
+                statusGroup: "active",
+                nextPlaintiffs: "Litigate expanded claims against Bergen County defendants",
+                nextDefendants: "Respond to amended complaint",
+                lastEvent: "Amended complaint adds plaintiffs and Bergen County defendants — June 2026", lastDate: "2026-06-02",
+                nextMilestone: "Defendants respond to amended complaint", milestoneDate: "2026-09-01",
+                anjrpc: false, nj: true
+            },
+            {
+                id: "2:25-cv-17797", name: "Platkin v. Sig Sauer (P320)", court: "D.N.J.", courtLevel: "District",
+                category: "Firearms Industry Liability", state: "NJ",
+                summary: "NJ AG sues Sig Sauer under Firearms Industry Public Safety Act and Consumer Fraud Act over P320 pistol's alleged unintentional discharge defect. Seeks halt of P320 sales and mandatory recall. Related to NSSF v. Platkin PLCAA challenge. Filed Oct 2025; removed to federal court Nov 2025.",
+                plaintiffs: "Matthew Platkin (NJ AG), NJ Division of Consumer Affairs",
+                defendants: "Sig Sauer Inc.",
+                status: "Active — early stage", statusClass: "status-active",
+                statusGroup: "active",
+                nextPlaintiffs: "Pursue product liability claims",
+                nextDefendants: "Challenge lawsuit; potential PLCAA defense",
+                lastEvent: "Filed Oct 16, 2025; removed to federal court November 2025", lastDate: "2025-11-20",
+                nextMilestone: "Motion practice", milestoneDate: "2026-12-01",
+                anjrpc: false, nj: true
+            },
+            {
+                id: "3:25-cv-13522", name: "FPC v. Platkin (Suppressors)", court: "D.N.J.", courtLevel: "District",
+                category: "Suppressor Ban", state: "NJ",
+                summary: "FPC companion case to Padua v. Platkin challenging NJ's complete ban on firearm suppressors. Filed same day as Padua (July 18, 2025).",
+                plaintiffs: "Firearms Policy Coalition, individual plaintiffs",
+                defendants: "Matthew Platkin (NJ AG), Patrick Callahan (State Police)",
+                status: "Active — early stage", statusClass: "status-active",
+                statusGroup: "active",
+                nextPlaintiffs: "Continue discovery and motion practice",
+                nextDefendants: "Defend suppressor ban constitutionality",
+                lastEvent: "Complaint filed July 18, 2025", lastDate: "2025-07-18",
+                nextMilestone: "Discovery and motions ongoing", milestoneDate: "2026-12-01",
+                anjrpc: false, nj: true
+            },
+            {
+                id: "MER-L-TBD-26", name: "Petrolino v. NJ State Police", court: "NJ Superior Court (Mercer)", courtLevel: "State",
+                category: "Records Access / OPRA", state: "NJ",
+                summary: "2A journalist John Petrolino challenges NJSP denial of OPRA requests for demographic data on retired law enforcement officer carry permits. Petrolino previously uncovered racial disparities in NJ permit-to-carry denials. NJSP denied requests citing N.J.A.C. 13:54-1.15 confidentiality rule. Claims filed under OPRA, common law right of access, and NJ Civil Rights Act. Filed Feb 27, 2026 before Judge Robert T. Lougy. A decision was expected by late April 2026, but as of June 11, 2026 the court has not issued a ruling and the matter remains under advisement.",
+                plaintiffs: "John Petrolino",
+                defendants: "New Jersey State Police, Trooper 'X' (records custodian)",
+                status: "Decision pending", statusClass: "status-pending",
+                statusGroup: "active",
+                nextPlaintiffs: "Await court decision on OPRA summary action",
+                nextDefendants: "Defend denial of records requests",
+                lastEvent: "OPRA summary action filed February 27, 2026", lastDate: "2026-02-27",
+                nextMilestone: "Ruling under advisement — decision overdue as of June 2026", milestoneDate: "2026-06-30",
+                anjrpc: false, nj: true
+            }
+        ];
+        const MILESTONES = [
+            { date: "2026-07-01", title: "SCOTUS Decisions — Wolford & Hemani", desc: "Supreme Court expected to decide private property carry (Wolford) and drug user prohibition (Hemani)" },
+            { date: "2026-06-30", title: "ANJRPC v. Platkin — En Banc Decision Expected", desc: "NJ assault weapons and magazine ban case. En banc oral arguments held Oct 15, 2025. Stay in place — AWB and mag ban enforceable until ruling." },
+            { date: "2026-09-30", title: "Koons/Siegel En Banc Decision Expected", desc: "Third Circuit decision on NJ sensitive places and carry restrictions" },
+            { date: "2026-07-10", title: "Padua v. Platkin — Dispositive Motions Due", desc: "Deadline for dispositive motions in NJ suppressor ban challenge (companion case: FPC v. Platkin). Status conference held May 22, 2026." },
+            { date: "2026-08-06", title: "Bergmann-Schoch v. Platkin — Status Conference", desc: "Summary judgment cross-motions fully briefed as of May 28, 2026. Status conference on hollow point ammo ban challenge." },
+            { date: "2026-09-01", title: "Defense Distributed v. Davenport — En Banc Rehearing Decision", desc: "Third Circuit decides whether to rehear 3D-printed firearms files case en banc" },
+            { date: "2026-04-28", title: "Petrolino v. NJ State Police — Decision Expected", desc: "Mercer County Superior Court decision on OPRA challenge to NJSP denial of retired LEO carry permit demographic data. Expected late April 2026; not yet issued as of June 11, 2026 — matter under advisement." },
+            { date: "2026-12-01", title: "NJ District Court Cases — Progress Check", desc: "Padua & FPC (suppressors), Struck/Benton (gun rationing/permits), Hague (under-21), NSSF & Sig Sauer (liability) motion practice" }
+        ];
+        const COLORS = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#be185d','#4338ca','#059669','#b45309','#e11d48','#0d9488','#6d28d9','#ca8a04','#475569','#2dd4bf'];
+        class Dashboard {
+            constructor(data) {
+                this.rawData = data;
+                this.filteredData = data;
+                this.charts = {};
+                this.sortCol = 'lastDate';
+                this.sortDir = 'desc';
+                this.init();
+            }
+            init() {
+                document.getElementById('update-date').textContent = 'June 11, 2026';
+                this.populateFilters();
+                this.render();
+            }
+            populateFilters() {
+                this.populateSelect('filter-court', 'courtLevel');
+                this.populateSelect('filter-category', 'category');
+            }
+            populateSelect(id, field) {
+                const sel = document.getElementById(id);
+                while (sel.options.length > 1) sel.remove(1);
+                const vals = [...new Set(this.rawData.map(d => d[field]))].sort();
+                vals.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
+            }
+            applyFilters() {
+                const court = document.getElementById('filter-court').value;
+                const cat = document.getElementById('filter-category').value;
+                const status = document.getElementById('filter-status').value;
+                const anjrpc = document.getElementById('filter-anjrpc').value;
+                const search = document.getElementById('search-input').value.toLowerCase();
+                this.filteredData = this.rawData.filter(c => {
+                    if (court !== 'all' && c.courtLevel !== court) return false;
+                    if (cat !== 'all' && c.category !== cat) return false;
+                    if (status !== 'all' && c.statusGroup !== status) return false;
+                    if (anjrpc === 'yes' && !c.anjrpc) return false;
+                    if (search && !(c.name.toLowerCase().includes(search) || c.summary.toLowerCase().includes(search) || c.category.toLowerCase().includes(search) || c.plaintiffs.toLowerCase().includes(search) || c.defendants.toLowerCase().includes(search))) return false;
+                    return true;
+                });
+                this.render();
+            }
+            render() {
+                this.renderKPIs();
+                try { this.renderCharts(); } catch (e) { console.error('Chart render error:', e); }
+                this.renderTimeline();
+                this.renderTable();
+            }
+            renderKPIs() {
+                const d = this.filteredData;
+                const total = d.length;
+                const active = d.filter(c => c.statusGroup === 'active').length;
+                const njCases = d.filter(c => c.nj).length;
+                const anjrpcCases = d.filter(c => c.anjrpc).length;
+                const scotus = d.filter(c => c.courtLevel === 'SCOTUS').length;
+                const cats = new Set(d.map(c => c.category)).size;
+                const html = `
+                    <div class="kpi-card"><div class="kpi-label">Total Cases</div><div class="kpi-value">${total}</div><div class="kpi-detail">${cats} categories</div></div>
+                    <div class="kpi-card"><div class="kpi-label">Active</div><div class="kpi-value" style="color:var(--accent)">${active}</div><div class="kpi-detail">Pending decision or briefing</div></div>
+                    <div class="kpi-card"><div class="kpi-label">NJ Cases</div><div class="kpi-value" style="color:var(--warning)">${njCases}</div><div class="kpi-detail">${anjrpcCases} with ANJRPC</div></div>
+                    <div class="kpi-card"><div class="kpi-label">Supreme Court</div><div class="kpi-value" style="color:#7c3aed">${scotus}</div><div class="kpi-detail">Active or recently decided</div></div>
+                `;
+                document.getElementById('kpi-row').innerHTML = html;
+            }
+            renderCharts() {
+                // Built entirely via JS/CSSOM (no inline style/onclick attributes, no reliance on the
+                // <style> block) so the charts survive CMS sanitizers and strict CSP when pasted into a site.
+                const self = this;
+                // ---- Cases by Category (horizontal bars) ----
+                const catCounts = {};
+                this.filteredData.forEach(c => { catCounts[c.category] = (catCounts[c.category]||0)+1; });
+                const catLabels = Object.keys(catCounts).sort((a,b) => catCounts[b]-catCounts[a]);
+                const maxCat = Math.max.apply(null, catLabels.map(l => catCounts[l]).concat([1]));
+                const activeCat = (document.getElementById('filter-category') || {}).value || 'all';
+                const catEl = document.getElementById('cbox-category');
+                if (catEl) {
+                    catEl.style.position = 'relative'; catEl.style.width = '100%'; catEl.style.height = '500px';
+                    catEl.textContent = '';
+                    const wrap = document.createElement('div');
+                    wrap.style.cssText = 'display:flex;flex-direction:column;justify-content:space-evenly;height:100%;';
+                    catLabels.forEach((l, i) => {
+                        const v = catCounts[l];
+                        const pct = Math.max(2, v / maxCat * 100);
+                        const color = COLORS[i % COLORS.length];
+                        const isActive = activeCat === l;
+                        const row = document.createElement('div');
+                        row.style.cssText = 'display:grid;grid-template-columns:150px 1fr 28px;align-items:center;gap:8px;cursor:pointer;padding:2px 4px;border-radius:4px;';
+                        row.style.background = isActive ? '#e0e7ff' : 'transparent';
+                        row.title = l + ' — ' + v + (v === 1 ? ' case' : ' cases') + ' (click to filter)';
+                        const lab = document.createElement('div');
+                        lab.style.cssText = 'font-size:11px;color:#6c757d;text-align:right;line-height:1.15;';
+                        lab.textContent = l;
+                        const track = document.createElement('div');
+                        track.style.cssText = 'background:#f1f5f9;border-radius:4px;height:20px;overflow:hidden;';
+                        const fill = document.createElement('div');
+                        fill.style.cssText = 'height:100%;border-radius:4px;min-width:2px;';
+                        fill.style.width = pct + '%'; fill.style.background = color;
+                        track.appendChild(fill);
+                        const val = document.createElement('div');
+                        val.style.cssText = 'font-size:11px;color:#6c757d;font-weight:600;';
+                        val.textContent = v;
+                        row.appendChild(lab); row.appendChild(track); row.appendChild(val);
+                        row.addEventListener('click', function(){ self.filterByCategory(l); });
+                        row.addEventListener('mouseenter', function(){ row.style.background = '#eef2f7'; });
+                        row.addEventListener('mouseleave', function(){ row.style.background = isActive ? '#e0e7ff' : 'transparent'; });
+                        wrap.appendChild(row);
+                    });
+                    catEl.appendChild(wrap);
+                }
+                // ---- Cases by Court Level (doughnut) ----
+                const courtCounts = {};
+                this.filteredData.forEach(c => { courtCounts[c.courtLevel] = (courtCounts[c.courtLevel]||0)+1; });
+                const courtLabels = Object.keys(courtCounts);
+                const courtColors = ['#7c3aed','#2563eb','#16a34a','#d97706'];
+                const activeCourt = (document.getElementById('filter-court') || {}).value || 'all';
+                const totalCourt = courtLabels.reduce((s,l) => s + courtCounts[l], 0) || 1;
+                const courtEl = document.getElementById('cbox-court');
+                if (courtEl) {
+                    courtEl.style.position = 'relative'; courtEl.style.width = '100%'; courtEl.style.height = '280px';
+                    courtEl.textContent = '';
+                    const dwrap = document.createElement('div');
+                    dwrap.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:24px;height:100%;flex-wrap:wrap;';
+                    let acc = 0; const segs = [];
+                    courtLabels.forEach((l, i) => {
+                        const start = acc / totalCourt * 100; acc += courtCounts[l]; const end = acc / totalCourt * 100;
+                        segs.push(courtColors[i % courtColors.length] + ' ' + start + '% ' + end + '%');
+                    });
+                    const donut = document.createElement('div');
+                    donut.style.cssText = 'width:180px;height:180px;border-radius:50%;position:relative;flex:0 0 auto;';
+                    donut.style.background = courtLabels.length ? ('conic-gradient(' + segs.join(', ') + ')') : '#e2e8f0';
+                    const hole = document.createElement('div');
+                    hole.style.cssText = 'position:absolute;top:22.5%;left:22.5%;right:22.5%;bottom:22.5%;background:#ffffff;border-radius:50%;';
+                    donut.appendChild(hole);
+                    const leg = document.createElement('div');
+                    leg.style.cssText = 'display:flex;flex-direction:column;gap:6px;font-size:12px;color:#1a1a2e;';
+                    courtLabels.forEach((l, i) => {
+                        const cv = courtCounts[l];
+                        const isActive = activeCourt === l;
+                        const item = document.createElement('div');
+                        item.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;padding:3px 8px;border-radius:4px;';
+                        item.style.background = isActive ? '#e0e7ff' : 'transparent';
+                        item.style.fontWeight = isActive ? '600' : '400';
+                        item.title = l + ' — ' + cv + (cv === 1 ? ' case' : ' cases') + ' (click to filter)';
+                        const dot = document.createElement('span');
+                        dot.style.cssText = 'width:10px;height:10px;border-radius:50%;flex:0 0 auto;display:inline-block;';
+                        dot.style.background = courtColors[i % courtColors.length];
+                        item.appendChild(dot);
+                        item.appendChild(document.createTextNode(l + ': ' + cv));
+                        item.addEventListener('click', function(){ self.filterByCourt(l); });
+                        item.addEventListener('mouseenter', function(){ item.style.background = '#eef2f7'; });
+                        item.addEventListener('mouseleave', function(){ item.style.background = isActive ? '#e0e7ff' : 'transparent'; });
+                        leg.appendChild(item);
+                    });
+                    dwrap.appendChild(donut); dwrap.appendChild(leg);
+                    courtEl.appendChild(dwrap);
+                }
+            }
+            renderTimeline() {
+                const now = new Date();
+                const parseLocal = s => new Date(s + 'T00:00:00');
+                const upcoming = MILESTONES.filter(m => parseLocal(m.date) >= now).sort((a,b) => parseLocal(a.date)-parseLocal(b.date));
+                const html = upcoming.map(m => {
+                    const d = parseLocal(m.date);
+                    const dateStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+                    return `<div class="timeline-item">
+                        <div class="timeline-date">${dateStr}</div>
+                        <div class="timeline-content">
+                            <div class="timeline-title">${m.title}</div>
+                            <div class="timeline-desc">${m.desc}</div>
+                        </div>
+                    </div>`;
+                }).join('');
+                document.getElementById('timeline').innerHTML = html || '<div style="font-size:13px;color:var(--text-secondary)">No upcoming milestones in filtered view</div>';
+            }
+            renderTable() {
+                const d = [...this.filteredData].sort((a,b) => {
+                    let av = a[this.sortCol]||'', bv = b[this.sortCol]||'';
+                    if (typeof av === 'boolean') { av = av?1:0; bv = bv?1:0; }
+                    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+                    return this.sortDir === 'asc' ? cmp : -cmp;
+                });
+                document.getElementById('table-count').textContent = `Showing ${d.length} of ${this.rawData.length} cases`;
+                const cols = [
+                    {key:'id', label:'Case #'},
+                    {key:'name', label:'Case Name'},
+                    {key:'court', label:'Court'},
+                    {key:'category', label:'Category'},
+                    {key:'status', label:'Status'},
+                    {key:'lastDate', label:'Last Update'},
+                    {key:'_actions', label:''}
+                ];
+                let thead = '<tr>';
+                cols.forEach(c => {
+                    const arrow = this.sortCol===c.key ? (this.sortDir==='asc'?' ▲':' ▼') : '';
+                    thead += `<th onclick="dashboard.sort('${c.key}')">${c.label}${arrow}</th>`;
+                });
+                thead += '</tr>';
+                document.getElementById('table-head').innerHTML = thead;
+                let tbody = '';
+                d.forEach((c, i) => {
+                    const flags = (c.anjrpc ? '<span class="anjrpc-flag">ANJRPC</span>' : '');
+                    tbody += `<tr>
+                        <td style="overflow-wrap:break-word;font-family:monospace;font-size:12px">${c.id}</td>
+                        <td><strong>${c.name}</strong>${flags}</td>
+                        <td>${c.court}</td>
+                        <td><span class="category-tag">${c.category}</span></td>
+                        <td><span class="status-badge ${c.statusClass}">${c.status}</span></td>
+                        <td style="white-space:nowrap">${c.lastDate || 'N/A'}</td>
+                        <td><button class="expand-btn" onclick="dashboard.toggle(${i})">Details</button></td>
+                    </tr>`;
+                    tbody += `<tr class="detail-row" id="detail-${i}"><td colspan="7">
+                        <div style="margin-bottom:8px;font-size:13px">${c.summary}</div>
+                        <div class="detail-grid">
+                            <div><div class="detail-label">Plaintiffs</div><div class="detail-value">${c.plaintiffs}</div></div>
+                            <div><div class="detail-label">Defendants</div><div class="detail-value">${c.defendants}</div></div>
+                            <div><div class="detail-label">Next Step — Plaintiffs</div><div class="detail-value">${c.nextPlaintiffs}</div></div>
+                            <div><div class="detail-label">Next Step — Defendants</div><div class="detail-value">${c.nextDefendants}</div></div>
+                            <div><div class="detail-label">Last Significant Event</div><div class="detail-value">${c.lastEvent}</div></div>
+                            <div><div class="detail-label">Next Milestone</div><div class="detail-value">${c.nextMilestone || 'N/A'}</div></div>
+                        </div>
+                    </td></tr>`;
+                });
+                document.getElementById('table-body').innerHTML = tbody;
+            }
+            sort(col) {
+                if (col === '_actions') return;
+                if (this.sortCol === col) { this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc'; }
+                else { this.sortCol = col; this.sortDir = 'desc'; }
+                this.renderTable();
+            }
+            toggle(i) {
+                const row = document.getElementById('detail-'+i);
+                row.classList.toggle('open');
+            }
+            filterByCategory(cat) {
+                const sel = document.getElementById('filter-category');
+                if (!sel) return;
+                sel.value = (sel.value === cat) ? 'all' : cat;
+                this.applyFilters();
+            }
+            filterByCourt(court) {
+                const sel = document.getElementById('filter-court');
+                if (!sel) return;
+                sel.value = (sel.value === court) ? 'all' : court;
+                this.applyFilters();
+            }
+        }
+        const dashboard = new Dashboard(CASES);
+        function reflowCharts(){ try { dashboard.renderCharts(); } catch (e) { console.error('chart reflow error', e); } }
+        document.addEventListener('visibilitychange', function(){ if (!document.hidden) reflowCharts(); });
+        window.addEventListener('pageshow', reflowCharts);
+        window.addEventListener('focus', reflowCharts);
+        if (window.IntersectionObserver) {
+            var _io = new IntersectionObserver(function(entries){ for (var i=0;i<entries.length;i++){ if (entries[i].isIntersecting){ reflowCharts(); break; } } }, { threshold: 0.05 });
+            var _cb = document.querySelector('.cbox'); if (_cb) _io.observe(_cb);
+        }
+        if (window.ResizeObserver) {
+            var _wasZero = true;
+            var _ro = new ResizeObserver(function(entries){ var r = entries[0].contentRect; var vis = r.width > 0 && r.height > 0; if (vis && _wasZero) reflowCharts(); _wasZero = !vis; });
+            var _cbr = document.querySelector('.cbox'); if (_cbr) _ro.observe(_cbr);
+        }
+    </script>
+</body>
+</html>
